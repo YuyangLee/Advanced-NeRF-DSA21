@@ -1,0 +1,7 @@
+hierar_vis
+logs
+data
+wandb
+misc
+*.log
+*nohup*

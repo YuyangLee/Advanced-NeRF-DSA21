@@ -1,0 +1,19 @@
+expname = multihuman
+basedir = ./logs
+datadir = ./data/nerf_synthetic/multihuman
+dataset_type = blender
+
+no_batching = True
+
+use_viewdirs = True
+white_bkgd = True
+lrate_decay = 500
+
+N_samples = 64
+N_rand = 1024
+
+half_res = True
+
+testskip = 1
+lrate=1e-4
+i_weights=1000
