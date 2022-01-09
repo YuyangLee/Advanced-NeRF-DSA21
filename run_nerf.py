@@ -240,13 +240,13 @@ def create_nerf(args):
     #         os.listdir(os.path.join(basedir, expname))) if 'tar' in f]
     print("Loading from pretrained...")
     
-    ckpt = torch.load("/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/ptr.tar")
+    ckpt = torch.load("/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/090000.tar")
     start = ckpt['global_step']
     model.load_state_dict(ckpt['network_fn_state_dict'])
     if args.N_importance > 0:
         model_fine.load_state_dict(ckpt['network_fn_state_dict'])
-    else:
-        optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+    # else:
+    optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         
     # if model_fine is not None:
     #     model_fine.load_state_dict(ckpt['network_fine_state_dict'])
@@ -625,7 +625,7 @@ def train(args):
     
     # Short circuit if only reconstruct the scene from trained model
     if args.reconstruct_only:
-        reconstruct(args, render_kwargs_train, ".")
+        reconstruct(args, render_kwargs_train, "rec_only.html")
         return
 
     # Short circuit if only rendering out from trained model
@@ -840,7 +840,7 @@ def train(args):
         global_step += 1
 
 def reconstruct(args, render_kwargs_train, dir, step=None):
-    scene = Scene()
+    scene = Scene(oct_default_depth=6, range=[[-1, 1], [0, 2], [-1, 1]], resolution=0.04, use_octree=False)
     volume = scene.reconstruct_volume(network_fn=render_kwargs_train['network_fine' if args.N_importance > 0 else 'network_fn'], query_fn=render_kwargs_train['network_query_fn'])
     fig = graph(volume, dir)
     # if not args.reconstruct_only:

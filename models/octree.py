@@ -1,5 +1,5 @@
 '''
-LastEditTime: 2022-01-09 16:45:01
+LastEditTime: 2022-01-09 19:15:24
 Description: Your description
 Date: 2022-01-09 10:34:17
 Author: Aiden Li
@@ -25,23 +25,23 @@ class OctreeNode:
         if depth == 0 or self.has_children:
             return
         
-        self.has_children = True
         
         dx = (self.x_max - self.x_min) * 0.5
         dy = (self.y_max - self.y_min) * 0.5
         dz = (self.z_max - self.z_min) * 0.5
         
+        self.has_children = True
         for i in [0, 1]:
             for j in [0, 1]:
                 for k in [0, 1]:
                     self.children.append(OctreeNode([
                         [self.x_min + dx * i, self.x_min + dx * (i + 1)],
-                        [self.y_min + dy * i, self.y_min + dy * (j + 1)],
-                        [self.z_min + dz * i, self.z_min + dz * (k + 1)]
+                        [self.y_min + dy * j, self.y_min + dy * (j + 1)],
+                        [self.z_min + dz * k, self.z_min + dz * (k + 1)]
                     ], self.depth + 1))
                     self.children[-1].gen_children(depth - 1)
                     
-    def get_leaves(self, filter_fn):
+    def get_leaves(self, filter_fn=lambda x: True):
         leaves = []
         if self.has_children:
             for child in self.children:
