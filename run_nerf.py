@@ -840,7 +840,7 @@ def train(args):
         global_step += 1
 
 def reconstruct(args, render_kwargs_train, dir, step=None):
-    scene = Scene(oct_default_depth=6, range=[[-1, 1], [0, 2], [-1, 1]], resolution=0.04, use_octree=False)
+    scene = Scene(oct_default_depth=6, range=[[-1, 1], [0, 2], [-1, 1]], resolution=0.05, use_octree=False)
     volume = scene.reconstruct_volume(network_fn=render_kwargs_train['network_fine' if args.N_importance > 0 else 'network_fn'], query_fn=render_kwargs_train['network_query_fn'])
     fig = graph(volume, dir)
     # if not args.reconstruct_only:
