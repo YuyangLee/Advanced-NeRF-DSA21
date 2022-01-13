@@ -1,5 +1,5 @@
 '''
-LastEditTime: 2022-01-13 14:15:44
+LastEditTime: 2022-01-13 17:47:17
 Description: Your description
 Date: 2022-01-09 10:34:17
 Author: Aiden Li
@@ -10,15 +10,15 @@ import torch
 import numpy as np
 
 class OctreeNode:
-    def __init__(self, range, depth, init_with_depth = 0):
+    def __init__(self, range, init_with_depth = 3):
         self.range = range
-        self.depth = depth
         [[self.x_min, self.x_max], [self.y_min, self.y_max], [self.z_min, self.z_max]] = range
         self.children = []
         
         # `has_child` XOR `is_leaf`
         self.has_children = False
-        self.chunk_size = np.min((np.asarray(self.range)[:, 1] - np.asarray(self.range)[:, 0]))
+        self.min_chunk_size = np.min((np.asarray(self.range)[:, 1] - np.asarray(self.range)[:, 0]))
+        self.max_chunk_size = np.max((np.asarray(self.range)[:, 1] - np.asarray(self.range)[:, 0]))
         
         self.gen_children(init_with_depth)
         
@@ -38,66 +38,20 @@ class OctreeNode:
                         [self.x_min + dx * i, self.x_min + dx * (i + 1)],
                         [self.y_min + dy * j, self.y_min + dy * (j + 1)],
                         [self.z_min + dz * k, self.z_min + dz * (k + 1)]
-                    ], self.depth + 1))
-                    self.children[-1].gen_children(depth - 1)
+                    ], depth - 1))
                     
-    def subdivide(self, filter_fn):
-        if self.has_children:
-            for child in self.children:
-                child.subdivide(filter_fn)
-        else:
-            self.gen_children()
-            # print(f"Divided { self.range }")
-            for child in self.children:
-                if filter_fn(child):
-                    child.subdivide(filter_fn)
-        
-                    
-    def get_leaves(self, filter_fn=lambda x: True):
+    def subdivide(self, min_chunk_size, filter_fn):
         leaves = []
         if self.has_children:
             for child in self.children:
-                if child.has_children:
-                    leaves += child.get_leaves(filter_fn)
-                else:
-                    if filter_fn(child):
-                        leaves.append(child)
-        return leaves
-                    
-    def central_point(self):
-        return np.asarray(
-            (self.x_min + self.x_max) * 0.5,
-            (self.y_min + self.y_max) * 0.5,
-            (self.z_min + self.z_max) * 0.5
-        )
-        
-    # Implemented by accident...
-    def children_bounding_boxes(self):
-        points = []
-        if self.has_children:
-            for child in self.children:
-                points += child.bounding_boxes()
+                leaves += child.subdivide(min_chunk_size, filter_fn)
         else:
-            points += [
-                np.asarray([self.x_max, self.y_min, self.z_min]),
-                np.asarray([self.x_min, self.y_max, self.z_min]),
-                np.asarray([self.x_max, self.y_max, self.z_min]),
-                np.asarray([self.x_min, self.y_min, self.z_min]),
-                np.asarray([self.x_max, self.y_max, self.z_max]),
-                np.asarray([self.x_min, self.y_max, self.z_max]),
-                np.asarray([self.x_max, self.y_min, self.z_max]),
-                np.asarray([self.x_min, self.y_min, self.z_max])
-            ]
-    
-    def bounding_box(self):
-        return np.asarray([
-            [self.x_min, self.y_min, self.z_min],
-            [self.x_max, self.y_min, self.z_min],
-            [self.x_min, self.y_max, self.z_min],
-            [self.x_max, self.y_max, self.z_min],
-            [self.x_min, self.y_min, self.z_max],
-            [self.x_max, self.y_max, self.z_max],
-            [self.x_min, self.y_max, self.z_max],
-            [self.x_max, self.y_min, self.z_max]
-        ])
-        
+            if filter_fn(self):
+                if self.min_chunk_size > min_chunk_size:
+                    self.gen_children()
+                    for child in self.children:
+                        leaves += child.subdivide(min_chunk_size, filter_fn)
+                else:
+                    leaves.append(self)
+                
+        return leaves

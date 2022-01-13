@@ -11,6 +11,7 @@ import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm, trange
+from utils.visualization import graph_volume
 
 from models.nerf import *
 from models.octree import *
@@ -57,17 +58,19 @@ def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
     Arguments:
     `inputs`: batch_size x num_sample x 6
     """
-    inputs_flat = inputs.reshape([-1, inputs.shape[-1]])
+    inputs_flat = inputs.view([-1, inputs.shape[-1]])
     embedded = embed_fn(inputs_flat)
 
     if viewdirs is not None:
         input_dirs = viewdirs.unsqueeze(-2).expand(inputs.shape)
-        input_dirs_flat = torch.reshape(input_dirs, [-1, input_dirs.shape[-1]])
+        input_dirs_flat = input_dirs.reshape([-1, input_dirs.shape[-1]])
+        # input_dirs_flat = torch.reshape(input_dirs, [-1, input_dirs.shape[-1]])
         embedded_dirs = embeddirs_fn(input_dirs_flat)
         embedded = torch.cat([embedded, embedded_dirs], -1)
 
     outputs_flat = batchify(fn, netchunk)(embedded)
     outputs = torch.reshape(outputs_flat, list(inputs.shape[:-1]) + [outputs_flat.shape[-1]])
+    outputs = outputs_flat.view(list(inputs.shape[:-1]) + [outputs_flat.shape[-1]])
     return outputs
 
 def batchify_rays(rays_flat, chunk=1024*32, **kwargs):
@@ -511,8 +514,8 @@ def config_parser():
     # reconstruction options
     parser.add_argument("--reconstruct_only", type=bool, default=False,
                         help="do not optimize, relaod weights and reconstruct the 3D scene")
-    parser.add_argument("--reconstruct_with_octree", type=bool, default=True,
-                        help="reconstruct the 3D scene with OCTree")
+    parser.add_argument("--reconstruct_mode", type=str, default='octree_lite',
+                        help="reconstruct the 3D scene with various modees: direct | octree | octree_lite")
     parser.add_argument("--rec_export_filename", type=str, default="reconstruct.html",
                         help="filename of exported file of reconstruction")
     parser.add_argument("--reconstruct_range", type=list, default=[[-1, 1], [0, 2], [-1, 1]],
@@ -633,7 +636,7 @@ def train(args):
     # Short circuit if only reconstruct the scene from trained model
     if args.reconstruct_only:
         reconstruct_kwargs = {
-            "use_octree": args.reconstruct_with_octree,
+            "mode": args.reconstruct_mode,
             "export_filename": os.path.join(basedir, args.rec_export_filename),
             # "export_filename": args.rec_export_filename,
             "rec_network": render_kwargs_train['network_fine'] if (args.N_importance > 0) else render_kwargs_train['network_fn'],
@@ -857,17 +860,17 @@ def train(args):
 
 def reconstruct(reconstruct_kwargs):
     scene = Scene(
-        oct_default_depth=1,
+        oct_default_depth=4,
         range=reconstruct_kwargs['range'],
         resolution_neglog=reconstruct_kwargs['resolution_neglog'],
-        use_octree=reconstruct_kwargs['use_octree']
+        mode=reconstruct_kwargs['mode']
     )
     
     volume, dtime = scene.reconstruct_volume(reconstruct_kwargs)
-    wo = "w/" if reconstruct_kwargs['use_octree'] else "w/o"
+    wo = "w/o" if reconstruct_kwargs['mode'] == "direct" else "w/"
     
     print(f"Time assumption for reconstruction is { dtime }s with resolution { 2**reconstruct_kwargs['resolution_neglog'] } and { wo } OCTree.")
-    fig = graph(volume, reconstruct_kwargs['export_filename'])
+    fig = graph_volume(volume, reconstruct_kwargs['export_filename'])
     # if not args.reconstruct_only:
     #     writer.add_image("3D reconstruction", fig...., step)
     
@@ -880,8 +883,7 @@ if __name__ == '__main__':
     
     # Set arguments here...
     
-    
-    # args.no_batching = True
+    args.no_batching = True
     args.use_viewdirs = True
     args.white_bkgd = True
     args.lrate_decay = 500
@@ -895,15 +897,19 @@ if __name__ == '__main__':
     args.i_reconstruct = 500
     args.half_res = True
     
-    args.reconstruct_with_octree = False
+    args.reconstruct_with_octree = True
     args.reconstruct_only = True
-    args.reconstruct_range = [[-1., 1.], [0., 2.], [-.5, 1.]]
-    args.reconstruct_resolution_neglog = 5
+    args.reconstruct_range = [[-1., 1.], [0., 2.], [-1., 1.]]
+    args.reconstruct_mode = "octree_lite"
+    args.reconstruct_resolution_neglog = 7
     
     # Trained from pretrained params
     args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/100000.tar"
     # # Trained from un-pretrained params
     # args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/200000.tar"
+    
+    if args.reconstruct_mode not in ["direct", "octree", "octree_lite"]:
+        raise NotImplementedError()
     
     train(args)
     
