@@ -33,9 +33,8 @@ date_unique_tag = datetime.now().strftime("%Y-%m-%d")
 time_unique_tag = datetime.now().strftime("%H-%M-%S")
 
 device_id = 0
-torch.cuda.set_device("cuda:%d" % device_id)
-device = torch.device("cuda:%d" %
-                      device_id if torch.cuda.is_available() else "cpu")
+torch.cuda.set_device(f"cuda:{device_id}")
+device = torch.device(f"cuda:{device_id}" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
 DEBUG = False
 
@@ -153,7 +152,6 @@ def render(H, W, focal, chunk=1024*32, rays=None, cam_to_world=None, ndc=True,
     ret_dict = {k: all_ret[k] for k in all_ret if k not in k_extract}
     return ret_list + [ret_dict]
 
-
 def render_path(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
 
     H, W, focal = hwf
@@ -240,7 +238,7 @@ def create_nerf(args):
     #         os.listdir(os.path.join(basedir, expname))) if 'tar' in f]
     print("Loading from pretrained...")
     
-    ckpt = torch.load("/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/200000.tar")
+    ckpt = torch.load(args.load_from_snapshot)
     start = ckpt['global_step']
     model.load_state_dict(ckpt['network_fn_state_dict'])
     if args.N_importance > 0:
@@ -457,6 +455,8 @@ def config_parser():
                         help='where to store ckpts and logs')
     parser.add_argument("--datadir", type=str, default='./data/nerf_synthetic/multihuman/',
                         help='input data directory')
+    parser.add_argument("--load_from_snapshot", type=str, default="/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/ptr.tar",
+                        help="snapshot path")
 
     # training options
     parser.add_argument("--netdepth", type=int, default=8,
@@ -508,9 +508,17 @@ def config_parser():
     parser.add_argument("--render_factor", type=int, default=0,
                         help='downsampling factor to speed up rendering, set 4 or 8 for fast preview')
 
-    # reconstruct options
+    # reconstruction options
     parser.add_argument("--reconstruct_only", type=bool, default=False,
                         help="do not optimize, relaod weights and reconstruct the 3D scene")
+    parser.add_argument("--reconstruct_with_octree", type=bool, default=True,
+                        help="reconstruct the 3D scene with OCTree")
+    parser.add_argument("--rec_export_filename", type=str, default="reconstruct.html",
+                        help="filename of exported file of reconstruction")
+    parser.add_argument("--reconstruct_range", type=list, default=[[-1, 1], [0, 2], [-1, 1]],
+                        help="range of reconstruction")
+    parser.add_argument("--reconstruct_resolution_neglog", type=int, default=8,
+                        help="resolution of reconstruction, negative log")
     
     # training options
     parser.add_argument("--precrop_iters", type=int, default=0,
@@ -564,7 +572,6 @@ def config_parser():
 
 
 def train(args):
-    
     
     # Load data
     images, poses, render_poses, hwf, i_split = load_blender_data(args.datadir)
@@ -625,7 +632,16 @@ def train(args):
     
     # Short circuit if only reconstruct the scene from trained model
     if args.reconstruct_only:
-        reconstruct(args, render_kwargs_train, "rec_only.html")
+        reconstruct_kwargs = {
+            "use_octree": args.reconstruct_with_octree,
+            "export_filename": os.path.join(basedir, args.rec_export_filename),
+            # "export_filename": args.rec_export_filename,
+            "rec_network": render_kwargs_train['network_fine'] if (args.N_importance > 0) else render_kwargs_train['network_fn'],
+            "network_query_fn": render_kwargs_train['network_query_fn'],
+            "range": args.reconstruct_range,
+            "resolution_neglog": args.reconstruct_resolution_neglog
+        }
+        reconstruct(reconstruct_kwargs=reconstruct_kwargs)
         return
 
     # Short circuit if only rendering out from trained model
@@ -839,12 +855,22 @@ def train(args):
 
         global_step += 1
 
-def reconstruct(args, render_kwargs_train, dir, step=None):
-    scene = Scene(oct_default_depth=6, range=[[-1, 1], [0, 2], [-1, 1]], resolution=0.05, use_octree=False)
-    volume = scene.reconstruct_volume(network_fn=render_kwargs_train['network_fine' if args.N_importance > 0 else 'network_fn'], query_fn=render_kwargs_train['network_query_fn'])
-    fig = graph(volume, dir)
+def reconstruct(reconstruct_kwargs):
+    scene = Scene(
+        oct_default_depth=1,
+        range=reconstruct_kwargs['range'],
+        resolution_neglog=reconstruct_kwargs['resolution_neglog'],
+        use_octree=reconstruct_kwargs['use_octree']
+    )
+    
+    volume, dtime = scene.reconstruct_volume(reconstruct_kwargs)
+    wo = "w/" if reconstruct_kwargs['use_octree'] else "w/o"
+    
+    print(f"Time assumption for reconstruction is { dtime }s with resolution { 2**reconstruct_kwargs['resolution_neglog'] } and { wo } OCTree.")
+    fig = graph(volume, reconstruct_kwargs['export_filename'])
     # if not args.reconstruct_only:
     #     writer.add_image("3D reconstruction", fig...., step)
+    
 
 if __name__ == '__main__':
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
@@ -853,9 +879,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     # Set arguments here...
-    args.reconstruct_only = True
     
-    args.no_batching = True
+    
+    # args.no_batching = True
     args.use_viewdirs = True
     args.white_bkgd = True
     args.lrate_decay = 500
@@ -868,6 +894,16 @@ if __name__ == '__main__':
     args.i_weights=1000
     args.i_reconstruct = 500
     args.half_res = True
+    
+    args.reconstruct_with_octree = False
+    args.reconstruct_only = True
+    args.reconstruct_range = [[-1., 1.], [0., 2.], [-.5, 1.]]
+    args.reconstruct_resolution_neglog = 5
+    
+    # Trained from pretrained params
+    args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/100000.tar"
+    # # Trained from un-pretrained params
+    # args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/200000.tar"
     
     train(args)
     

@@ -1,5 +1,5 @@
 '''
-LastEditTime: 2022-01-09 19:15:24
+LastEditTime: 2022-01-13 14:15:44
 Description: Your description
 Date: 2022-01-09 10:34:17
 Author: Aiden Li
@@ -18,13 +18,13 @@ class OctreeNode:
         
         # `has_child` XOR `is_leaf`
         self.has_children = False
+        self.chunk_size = np.min((np.asarray(self.range)[:, 1] - np.asarray(self.range)[:, 0]))
         
         self.gen_children(init_with_depth)
         
     def gen_children(self, depth=1):
         if depth == 0 or self.has_children:
             return
-        
         
         dx = (self.x_max - self.x_min) * 0.5
         dy = (self.y_max - self.y_min) * 0.5
@@ -40,6 +40,18 @@ class OctreeNode:
                         [self.z_min + dz * k, self.z_min + dz * (k + 1)]
                     ], self.depth + 1))
                     self.children[-1].gen_children(depth - 1)
+                    
+    def subdivide(self, filter_fn):
+        if self.has_children:
+            for child in self.children:
+                child.subdivide(filter_fn)
+        else:
+            self.gen_children()
+            # print(f"Divided { self.range }")
+            for child in self.children:
+                if filter_fn(child):
+                    child.subdivide(filter_fn)
+        
                     
     def get_leaves(self, filter_fn=lambda x: True):
         leaves = []

@@ -1,5 +1,5 @@
 '''
-LastEditTime: 2022-01-09 19:27:21
+LastEditTime: 2022-01-13 14:00:10
 Description: Your description
 Date: 2022-01-09 07:45:29
 Author: Aiden Li
@@ -25,6 +25,7 @@ class Volume:
     def __init__(self, range=[[-0.1, 0.1]]*3, resolution=0.05, device='cuda'):
         self.range = range
         self.device = device
+        self.chunk_size = np.min((np.asarray(self.range)[:, 1] - np.asarray(self.range)[:, 0]))
         self.resolution = resolution
         [[self.x_min, self.x_max], [self.y_min, self.y_max], [self.z_min, self.z_max]] =range
     
@@ -37,22 +38,12 @@ class Volume:
         xx, yy, zz = torch.meshgrid([x_axis, y_axis, z_axis])
         return torch.concat([xx.unsqueeze(-1), yy.unsqueeze(-1), zz.unsqueeze(-1)], dim=-1)
     
-    def test_contents(self, network_fn, query_fn, threshold=0.4):
-        if self.resolution < np.max([self.x_max - self.x_min, self.y_max - self.y_min, self.z_max - self.z_min]):
-            return False
-        
-        num_sample = 5 * 5
-        rand = torch.rand([5, 5, 3], device=self.device)
-        points = torch.concat(
-            [
-                torch.ones_like(rand) * self.x_min + (self.x_max - self.x_min),
-                torch.ones_like(rand) * self.y_min + (self.y_max - self.y_min),
-                torch.ones_like(rand) * self.z_min + (self.z_max - self.z_min)
-            ]
-        )
-        res = query_fn(points, torch.rand_like(points[:, 0], device=self.device), network_fn)[..., 3]
-        # return (res.reshape([-1]) > 0.5).sum() > num_sample * threshold
-        return (torch.sigmoid(res.reshape([-1])) > 0.5).sum() > num_sample * threshold
+    # def test_contents(self, network_fn, query_fn, threshold=0.4):
+    #     if self.resolution < np.max([self.x_max - self.x_min, self.y_max - self.y_min, self.z_max - self.z_min]):
+    #         return False
+    #     res = query_fn(points, torch.rand_like(points[:, 0], device=self.device), network_fn)[..., 3]
+    #     # return (res.reshape([-1]) > 0.5).sum() > num_sample * threshold
+    #     return (torch.sigmoid(res.reshape([-1])) > 0.5).sum() > num_sample * threshold
         
     def reconstruct(self, network_fn, query_fn):
         query = self.build_query()
