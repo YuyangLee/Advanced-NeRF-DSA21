@@ -240,7 +240,7 @@ def create_nerf(args):
     #         os.listdir(os.path.join(basedir, expname))) if 'tar' in f]
     print("Loading from pretrained...")
     
-    ckpt = torch.load("/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/090000.tar")
+    ckpt = torch.load("/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/200000.tar")
     start = ckpt['global_step']
     model.load_state_dict(ckpt['network_fn_state_dict'])
     if args.N_importance > 0:
@@ -248,8 +248,8 @@ def create_nerf(args):
     # else:
     optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         
-    # if model_fine is not None:
-    #     model_fine.load_state_dict(ckpt['network_fine_state_dict'])
+    if model_fine is not None:
+        model_fine.load_state_dict(ckpt['network_fine_state_dict'])
 
     # print('Found ckpts', ckpts)
     # if len(ckpts) > 0 and not args.no_reload:
@@ -451,7 +451,7 @@ def config_parser():
     parser.add_argument('--config', is_config_file=True,
                         help='config file path')
     # parser.add_argument("--expname", type=str,
-    parser.add_argument("--expname", type=str, default="pretrained",
+    parser.add_argument("--expname", type=str, default="just_train_it",
                         help='experiment name')
     parser.add_argument("--basedir", type=str, default='./logs/',
                         help='where to store ckpts and logs')
@@ -467,11 +467,11 @@ def config_parser():
                         help='layers in fine network')
     parser.add_argument("--netwidth_fine", type=int, default=256,
                         help='channels per layer in fine network')
-    parser.add_argument("--N_rand", type=int, default=32*32*4,
+    parser.add_argument("--N_rand", type=int, default=1024,
                         help='batch size (number of random rays per gradient step)')
     parser.add_argument("--lrate", type=float, default=5e-4,
                         help='learning rate')
-    parser.add_argument("--lrate_decay", type=int, default=250,
+    parser.add_argument("--lrate_decay", type=int, default=500,
                         help='exponential learning rate decay (in 1000 steps)')
     parser.add_argument("--chunk", type=int, default=1024*32,
                         help='number of rays processed in parallel, decrease if running out of memory')
@@ -519,7 +519,7 @@ def config_parser():
                         default=.5, help='fraction of img taken for central crops')
 
     # dataset options
-    parser.add_argument("--dataset_type", type=str, default='llff',
+    parser.add_argument("--dataset_type", type=str, default='blender',
                         help='options: llff / blender / deepvoxels')
     parser.add_argument("--testskip", type=int, default=8,
                         help='will load 1/N images from test/val sets, useful for large datasets like deepvoxels')
@@ -834,8 +834,8 @@ def train(args):
                 # writer.add_image('Disparity - Fine', extras_demo['disp_fine'].clone().cpu().numpy(), i)
                 # writer.add_image('Accept - Fine', extras_demo['acc_fine'].clone().cpu().numpy(), i)
 
-        if i % args.i_reconstruct == 0:
-            reconstruct(args, render_kwargs_train, os.path.join(rc_path, f"rec-{ i }.html"), i)
+        # if i % args.i_reconstruct == 0:
+        #     reconstruct(args, render_kwargs_train, os.path.join(rc_path, f"rec-{ i }.html"), i)
 
         global_step += 1
 
@@ -853,10 +853,21 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     # Set arguments here...
+    args.reconstruct_only = True
+    
+    args.no_batching = True
+    args.use_viewdirs = True
+    args.white_bkgd = True
+    args.lrate_decay = 500
     args.N_samples = 64
     args.N_importrance = 64
-    # args.reconstruct_only = True
+    args.N_rand = 1024
+    args.half_res = True
+    args.testskip = 1
+    args.lrate=1e-4
+    args.i_weights=1000
     args.i_reconstruct = 500
+    args.half_res = True
     
     train(args)
     

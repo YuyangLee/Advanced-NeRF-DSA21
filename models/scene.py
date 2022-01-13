@@ -1,5 +1,5 @@
 '''
-LastEditTime: 2022-01-09 19:30:40
+LastEditTime: 2022-01-12 18:24:07
 Description: Scene
 Date: 2022-01-09 15:29:54
 Author: Aiden Li
@@ -13,7 +13,7 @@ from models.octree import *
 from models.volume import *
 
 def graph(volume, dir):
-    verts, faces, _, _ = marching_cubes(volume, 1.0)
+    verts, faces, _, _ = marching_cubes(volume, 0.5)
     
     fig = go.Figure(go.Mesh3d(
         x=verts[:, 0],

@@ -51,10 +51,12 @@ class Volume:
             ]
         )
         res = query_fn(points, torch.rand_like(points[:, 0], device=self.device), network_fn)[..., 3]
-        return (res.reshape([-1]) > 0.5).sum() > num_sample * threshold
+        # return (res.reshape([-1]) > 0.5).sum() > num_sample * threshold
+        return (torch.sigmoid(res.reshape([-1])) > 0.5).sum() > num_sample * threshold
         
     def reconstruct(self, network_fn, query_fn):
         query = self.build_query()
-        volume = query_fn(query, torch.rand_like(query[:, :, 0], device='cuda'), network_fn)[..., 3]
+        # volume = query_fn(query, torch.rand_like(query[:, :, 0], device='cuda'), network_fn)[..., 3]
+        volume = torch.sigmoid(query_fn(query, torch.rand_like(query[:, :, 0], device='cuda'), network_fn)[..., 3])
         return volume
     
