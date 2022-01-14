@@ -1,5 +1,5 @@
 '''
-LastEditTime: 2022-01-14 16:55:28
+LastEditTime: 2022-01-14 17:33:59
 Description: Scene
 Date: 2022-01-09 15:29:54
 Author: Aiden Li
@@ -38,15 +38,6 @@ class Scene:
             self.min_divide = oct_default_depth
         else:
             raise NotImplementedError()
-        
-    def range_to_idx(self, range):
-        # range = [
-        #     [lo, hi] for x,
-        #     [lo, hi] for y,
-        #     [lo, hi] for z
-        # ]
-        range = np.asarray(self.range)
-        # x_ticks, y_ticks, z_ticks = (range[:, 1] - range[:, 0]) / self.resolution
         
     def reconstruct_volume(self, rec_kwargs):
         # volume = np.zeros([

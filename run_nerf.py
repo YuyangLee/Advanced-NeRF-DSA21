@@ -921,9 +921,9 @@ if __name__ == '__main__':
     args.reconstruct_with_octree = True
     args.reconstruct_only = True
     args.reconstruct_range = [[-1., 1.], [0., 2.], [-1., 1.]]
-    # args.reconstruct_mode = "direct"
+    args.reconstruct_mode = "direct"
     # args.reconstruct_mode = "octree_lite"
-    args.reconstruct_mode = "octree"
+    # args.reconstruct_mode = "octree"
     
     # Reconstruction arguments - params
     args.reconstruct_resolution = 2**(-7)
