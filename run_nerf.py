@@ -520,8 +520,16 @@ def config_parser():
                         help="filename of exported file of reconstruction")
     parser.add_argument("--reconstruct_range", type=list, default=[[-1, 1], [0, 2], [-1, 1]],
                         help="range of reconstruction")
-    parser.add_argument("--reconstruct_resolution_neglog", type=int, default=8,
-                        help="resolution of reconstruction, negative log")
+    parser.add_argument("--reconstruct_resolution", type=float, default=2**(-7),
+                        help="resolution of reconstruction")
+    parser.add_argument("--reconstruct_sparse_resolution", type=float, default=2**(-6),
+                        help="resolution of sparse query in octree-reconstruction")
+    parser.add_argument("--reconstruct_oct_init_depth", type=int, default=3,
+                        help="threshold for mean of sparse query in octree-reconstruction")
+    parser.add_argument("--reconstruct_oct_threshold", type=float, default=0.01,
+                        help="threshold for mean of sparse query in octree-reconstruction")
+    parser.add_argument("--reconstruct_min_chunk_size", type=float, default=0.25,
+                        help="threshold for minimum chunk size in octree-reconstruction")
     
     # training options
     parser.add_argument("--precrop_iters", type=int, default=0,
@@ -642,7 +650,11 @@ def train(args):
             "rec_network": render_kwargs_train['network_fine'] if (args.N_importance > 0) else render_kwargs_train['network_fn'],
             "network_query_fn": render_kwargs_train['network_query_fn'],
             "range": args.reconstruct_range,
-            "resolution_neglog": args.reconstruct_resolution_neglog
+            "resolution": args.reconstruct_resolution,
+            "min_chunk_size": args.reconstruct_min_chunk_size,
+            "sparse_resolution": args.reconstruct_sparse_resolution,
+            "threshold": args.reconstruct_oct_threshold,
+            "init_depth": args.reconstruct_oct_init_depth
         }
         reconstruct(reconstruct_kwargs=reconstruct_kwargs)
         return
@@ -860,29 +872,37 @@ def train(args):
 
 def reconstruct(reconstruct_kwargs):
     scene = Scene(
-        oct_default_depth=4,
+        oct_default_depth=reconstruct_kwargs['init_depth'],
         range=reconstruct_kwargs['range'],
-        resolution_neglog=reconstruct_kwargs['resolution_neglog'],
+        resolution=reconstruct_kwargs['resolution'],
         mode=reconstruct_kwargs['mode']
     )
     
-    volume, dtime = scene.reconstruct_volume(reconstruct_kwargs)
+    volume, time_s, time_r, blocks = scene.reconstruct_volume(reconstruct_kwargs)
     wo = "w/o" if reconstruct_kwargs['mode'] == "direct" else "w/"
     
-    print(f"Time assumption for reconstruction is { dtime }s with resolution { 2**reconstruct_kwargs['resolution_neglog'] } and { wo } OCTree.")
+    print(f"""
+---------------------- Report ----------------------
+Reconstructed with resolution { int((1 / reconstruct_kwargs['resolution'])) } x { int((1 / reconstruct_kwargs['resolution'])) } x { int((1 / reconstruct_kwargs['resolution'])) }
+{ wo } OCTree, in mode { reconstruct_kwargs['mode'] }
+Search: Searched in { str(time_s)[:5] } s
+Recon.: Inferred in { str(time_r)[:5] } s through { blocks } blocks
+Total Time Consum.: { str(time_s + time_r)[:5] } s
+----------------------------------------------------
+""")
     fig = graph_volume(volume, reconstruct_kwargs['export_filename'])
-    # if not args.reconstruct_only:
-    #     writer.add_image("3D reconstruction", fig...., step)
-    
 
 if __name__ == '__main__':
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
-    
     parser = config_parser()
     args = parser.parse_args()
     
-    # Set arguments here...
+    # Debug and export arguments
+    args.expname = "reconstruction_boost"
+    args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/100000.tar"
+    # args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/200000.tar"
     
+    # Training arguments
     args.no_batching = True
     args.use_viewdirs = True
     args.white_bkgd = True
@@ -897,16 +917,20 @@ if __name__ == '__main__':
     args.i_reconstruct = 500
     args.half_res = True
     
+    # Reconstruction arguments - basic
     args.reconstruct_with_octree = True
     args.reconstruct_only = True
     args.reconstruct_range = [[-1., 1.], [0., 2.], [-1., 1.]]
-    args.reconstruct_mode = "octree_lite"
-    args.reconstruct_resolution_neglog = 7
+    # args.reconstruct_mode = "direct"
+    # args.reconstruct_mode = "octree_lite"
+    args.reconstruct_mode = "octree"
     
-    # Trained from pretrained params
-    args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/100000.tar"
-    # # Trained from un-pretrained params
-    # args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/200000.tar"
+    # Reconstruction arguments - params
+    args.reconstruct_resolution = 2**(-7)
+    args.reconstruct_min_chunk_size = 0.25
+    args.reconstruction_sparse_resolution = 2**(-6)
+    args.reconstruction_mean_threshold = 0.01
+    args.reconstruct_oct_init_depth = 1
     
     if args.reconstruct_mode not in ["direct", "octree", "octree_lite"]:
         raise NotImplementedError()
