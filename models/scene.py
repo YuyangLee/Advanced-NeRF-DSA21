@@ -1,5 +1,5 @@
 '''
-LastEditTime: 2022-01-15 07:45:48
+LastEditTime: 2022-01-15 08:52:21
 Description: Scene
 Date: 2022-01-09 15:29:54
 Author: Aiden Li
@@ -40,23 +40,15 @@ class Scene:
             raise NotImplementedError()
         
     def reconstruct_volume(self, rec_kwargs):
-        # volume = np.zeros([
-        #     int((self.x_max - self.x_min) / self.resolution),
-        #     int((self.y_max - self.y_min) / self.resolution),
-        #     int((self.z_max - self.z_min) / self.resolution)
-        # ])
         volume = torch.zeros([
             int((self.x_max - self.x_min) / self.resolution),
             int((self.y_max - self.y_min) / self.resolution),
             int((self.z_max - self.z_min) / self.resolution)
         ], device='cuda')
         
-        # min_chunk_size = 2**(-rec_kwargs['resolution_neglog']) * (2**5)
         min_chunk_size = rec_kwargs['min_chunk_size']
         sparse_lo = np.asarray(self.range)[:, 0]
-        # threshold = 0.01
         threshold = rec_kwargs['threshold']
-        # sparse_resolution = 2**(-6)
         sparse_resolution = rec_kwargs['sparse_resolution']
         
         time_start = time.time()
@@ -65,9 +57,6 @@ class Scene:
             if self.mode == "octree":
                 sparse_volume = Volume(self.range, sparse_resolution).reconstruct(rec_kwargs['rec_network'], rec_kwargs['network_query_fn'])
                 query_nodes = self.octree.subdivide(min_chunk_size, lambda node: subdivide_discriminator(node, sparse_lo, sparse_volume, sparse_resolution, threshold))
-                # query_nodes = self.octree.subdivide(lambda node: node.max_chunk_size > max_chunk_size or (node.min_chunk_size > min_chunk_size and subdivide_discriminator(node, sparse_volume, sparse_resolution, threshold)))
-                # query_nodes = self.octree.get_leaves()
-                # query_nodes = self.octree.get_leaves(lambda node: np.min((np.asarray(node.range)[:, 1] - np.asarray(self.range)[:, 0])) > 1e-5)
                 query_blocks = len(query_nodes)
                 time_searched = time.time()
                 
@@ -78,8 +67,6 @@ class Scene:
                     volume[ind_dn[0]:ind_up[0], ind_dn[1]:ind_up[1], ind_dn[2]:ind_up[2]] = Volume(node.range, self.resolution).reconstruct(rec_kwargs['rec_network'], rec_kwargs['network_query_fn']).detach().cpu()
             
             elif self.mode == "direct":
-                # volume = Volume(self.range, self.resolution)
-                # volume = volume.reconstruct(rec_kwargs['rec_network'], rec_kwargs['network_query_fn']).detach().cpu().numpy()
                 volume = ol.reconstruct(self.range, self.resolution, rec_kwargs['rec_network'], rec_kwargs['network_query_fn'])
                 query_blocks = 1
             
@@ -93,7 +80,6 @@ class Scene:
                     ind_up = ((np.asarray(range)[:, 1] - np.asarray(self.range)[:, 0]) / self.resolution).astype(int)
                     ind_dn = ((np.asarray(range)[:, 0] - np.asarray(self.range)[:, 0]) / self.resolution).astype(int)
                     volume[ind_dn[0]:ind_up[0], ind_dn[1]:ind_up[1], ind_dn[2]:ind_up[2]] = ol.reconstruct(range, self.resolution, rec_kwargs['rec_network'], rec_kwargs['network_query_fn'])
-                    # volume[ind_dn[0]:ind_up[0], ind_dn[1]:ind_up[1], ind_dn[2]:ind_up[2]] = ol.reconstruct(range, self.resolution, rec_kwargs['rec_network'], rec_kwargs['network_query_fn']).detach().cpu().numpy()
             
             else:
                 raise NotImplementedError()
@@ -101,5 +87,4 @@ class Scene:
         volume = volume.detach().cpu().numpy()
         time_end = time.time()
         return volume, time_searched - time_start, time_end - time_searched, query_blocks
-        # return volume, time_end - time_start
     

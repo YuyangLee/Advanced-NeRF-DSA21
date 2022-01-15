@@ -155,44 +155,6 @@ def render(H, W, focal, chunk=1024*32, rays=None, cam_to_world=None, ndc=True,
     ret_dict = {k: all_ret[k] for k in all_ret if k not in k_extract}
     return ret_list + [ret_dict]
 
-def render_path(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
-
-    H, W, focal = hwf
-
-    if render_factor != 0:
-        # Render downsampled for speed
-        H = H//render_factor
-        W = W//render_factor
-        focal = focal/render_factor
-
-    rgbs = []
-    disps = []
-
-    t = time.time()
-    for i, cam_to_world in enumerate(tqdm(render_poses)):
-        print(i, time.time() - t)
-        t = time.time()
-        rgb, disp, acc, _ = render(H, W, focal, chunk=chunk, cam_to_world=cam_to_world[:3, :4], **render_kwargs)
-        rgbs.append(rgb.cpu().numpy())
-        disps.append(disp.cpu().numpy())
-        if i == 0:
-            print(rgb.shape, disp.shape)
-
-        """
-        if gt_imgs is not None and render_factor==0:
-            p = -10. * np.log10(np.mean(np.square(rgb.cpu().numpy() - gt_imgs[i])))
-            print(p)
-        """
-
-        if savedir is not None:
-            rgb8 = to8b(rgbs[-1])
-            filename = os.path.join(savedir, '{:03d}.png'.format(i))
-            imageio.imwrite(filename, rgb8)
-
-    rgbs = np.stack(rgbs, 0)
-    disps = np.stack(disps, 0)
-
-    return rgbs, disps
 
 
 def create_nerf(args):
@@ -249,9 +211,6 @@ def create_nerf(args):
     # else:
     optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         
-    if model_fine is not None:
-        model_fine.load_state_dict(ckpt['network_fine_state_dict'])
-
     # print('Found ckpts', ckpts)
     # if len(ckpts) > 0 and not args.no_reload:
     #     ckpt_path = ckpts[-1]
@@ -582,6 +541,44 @@ def config_parser():
     return parser
 
 
+def render_vids(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
+    H, W, focal = hwf
+
+    if render_factor != 0:
+        # Render downsampled for speed
+        H = H//render_factor
+        W = W//render_factor
+        focal = focal/render_factor
+
+    rgbs = []
+    disps = []
+
+    t = time.time()
+    for i, cam_to_world in enumerate(tqdm(render_poses)):
+        print(i, time.time() - t)
+        t = time.time()
+        rgb, disp, acc, _ = render(H, W, focal, chunk=chunk, cam_to_world=cam_to_world[:3, :4], **render_kwargs)
+        rgbs.append(rgb.cpu().numpy())
+        disps.append(disp.cpu().numpy())
+        if i == 0:
+            print(rgb.shape, disp.shape)
+
+        """
+        if gt_imgs is not None and render_factor==0:
+            p = -10. * np.log10(np.mean(np.square(rgb.cpu().numpy() - gt_imgs[i])))
+            print(p)
+        """
+
+        if savedir is not None:
+            rgb8 = to8b(rgbs[-1])
+            filename = os.path.join(savedir, '{:03d}.png'.format(i))
+            imageio.imwrite(filename, rgb8)
+
+    rgbs = np.stack(rgbs, 0)
+    disps = np.stack(disps, 0)
+
+    return rgbs, disps
+
 def train(args):
     
     # Load data
@@ -674,7 +671,7 @@ def train(args):
             os.makedirs(testsavedir, exist_ok=True)
             print('test poses shape', render_poses.shape)
 
-            rgbs, _ = render_path(render_poses, hwf, args.chunk, render_kwargs_test, gt_imgs=images, savedir=testsavedir, render_factor=args.render_factor)
+            rgbs, _ = render_vids(render_poses, hwf, args.chunk, render_kwargs_test, gt_imgs=images, savedir=testsavedir, render_factor=args.render_factor)
             print('Done rendering', testsavedir)
             imageio.mimwrite(os.path.join(
                 testsavedir, 'video.mp4'), to8b(rgbs), fps=30, quality=8)
@@ -787,36 +784,42 @@ def train(args):
             
         loss.backward()
         optimizer.step()
-        
+            
+        render_path = os.path.join(basedir, expname, "img", date_unique_tag, time_unique_tag, f"coarse-step_{i}.jpg")
+        fine_path = os.path.join(basedir, expname, "img", date_unique_tag, time_unique_tag, f"fine-step_{i}.jpg")
+        gt_path = os.path.join(basedir, expname, "img", date_unique_tag, time_unique_tag, f"gt-step_{i}.jpg")
+        rc_path = os.path.join(basedir, expname, "reconstruct", date_unique_tag, time_unique_tag)
+            
         dt = time.time() - time0
         # print(f"Step: {global_step}, Loss: {loss}, Time: {dt}")
         #####           end            #####
 
         # Rest is logging
-        if i % args.i_weights == 0:
-            path = os.path.join(basedir, expname, '{:06d}.tar'.format(i))
-            torch.save({
-                'global_step': global_step,
-                'network_fn_state_dict': render_kwargs_train['network_fn'].state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
-                'network_fine_state_dict': render_kwargs_train['network_fine'].state_dict() if args.N_importance > 0 else None
-            }, path)
-            print('Saved checkpoints at', path)
+        # if i % args.i_weights == 0:
+        #     path = os.path.join(basedir, expname, '{:06d}.tar'.format(i))
+        #     torch.save({
+        #         'global_step': global_step,
+        #         'network_fn_state_dict': render_kwargs_train['network_fn'].state_dict(),
+        #         'optimizer_state_dict': optimizer.state_dict(),
+        #         'network_fine_state_dict': render_kwargs_train['network_fine'].state_dict() if args.N_importance > 0 else None
+        #     }, path)
+        #     print('Saved checkpoints at', path)
 
+        if True:
         # if i % args.i_video == 0 and i > 0:
-        #     with torch.no_grad():
-        #         rgbs, disps = render_path(render_poses, hwf, args.chunk, render_kwargs_test)
-        #     print('Done, saving', rgbs.shape, disps.shape)
-        #     moviebase = os.path.join(basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
-        #     imageio.mimwrite(moviebase + 'rgb.mp4', to8b(rgbs), fps=30, quality=8)
-        #     imageio.mimwrite(moviebase + 'disp.mp4', to8b(disps / np.max(disps)), fps=30, quality=8)
+            with torch.no_grad():
+                rgbs, disps = render_vids(render_poses, hwf, args.chunk, render_kwargs_test)
+            print('Done, saving', rgbs.shape, disps.shape)
+            moviebase = os.path.join(basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
+            imageio.mimwrite(moviebase + 'rgb.mp4', to8b(rgbs), fps=30, quality=8)
+            imageio.mimwrite(moviebase + 'disp.mp4', to8b(disps / np.max(disps)), fps=30, quality=8)
 
-            # if args.use_viewdirs:
-            #     render_kwargs_test['cam_to_world_staticcam'] = render_poses[0][:3,:4]
-            #     with torch.no_grad():
-            #         rgbs_still, _ = render_path(render_poses, hwf, args.chunk, render_kwargs_test)
-            #     render_kwargs_test['cam_to_world_staticcam'] = None
-            #     imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
+            if args.use_viewdirs:
+                render_kwargs_test['cam_to_world_staticcam'] = render_poses[0][:3,:4]
+                with torch.no_grad():
+                    rgbs_still, _ = render_vids(render_poses, hwf, args.chunk, render_kwargs_test)
+                render_kwargs_test['cam_to_world_staticcam'] = None
+                imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
 
         # if i % args.i_testset == 0 and i > 0:
             # testsavedir = os.path.join(basedir, expname, 'testset_{:06d}'.format(i))
@@ -848,12 +851,6 @@ def train(args):
             writer.add_image('RGB', hwc2chw(rgb_demo_img), i)
             # writer.add_image('Disparity', disp_demo.clone().cpu().numpy(), i)
             # writer.add_image('Accept', acc_demo.clone().cpu().numpy(), i)
-            
-            render_path = os.path.join(basedir, expname, "img", date_unique_tag, time_unique_tag, f"coarse-step_{i}.jpg")
-            fine_path = os.path.join(basedir, expname, "img", date_unique_tag, time_unique_tag, f"fine-step_{i}.jpg")
-            gt_path = os.path.join(basedir, expname, "img", date_unique_tag, time_unique_tag, f"gt-step_{i}.jpg")
-            rc_path = os.path.join(basedir, expname, "reconstruct", date_unique_tag, time_unique_tag)
-            
             Image.fromarray(target_demo_img).save(gt_path)
             Image.fromarray(rgb_demo_img).save(render_path)
 
@@ -898,9 +895,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     # Debug and export arguments
+    # args.render_only = True
     args.expname = "reconstruction_boost"
-    args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/100000.tar"
-    # args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/200000.tar"
+    # args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/100000.tar"
+    args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/101000.tar"
     
     # Training arguments
     args.no_batching = True
@@ -919,7 +917,7 @@ if __name__ == '__main__':
     
     # Reconstruction arguments - basic
     args.reconstruct_with_octree = True
-    args.reconstruct_only = True
+    # args.reconstruct_only = True
     args.reconstruct_range = [[-1., 1.], [0., 2.], [-1., 1.]]
     args.reconstruct_mode = "direct"
     # args.reconstruct_mode = "octree_lite"

@@ -1,5 +1,5 @@
 '''
-LastEditTime: 2022-01-13 17:12:29
+LastEditTime: 2022-01-15 08:47:37
 Description: Your description
 Date: 2022-01-09 07:45:29
 Author: Aiden Li
@@ -29,10 +29,6 @@ class Volume:
     
     def build_query(self):
         x_ticks, y_ticks, z_ticks = ((np.asarray(self.range)[:, 1] - np.asarray(self.range)[:, 0]) / self.resolution).astype(int)
-        # x_axis = self.x_min + torch.arange(x_ticks) / x_ticks * (self.x_max - self.x_min)
-        # y_axis = self.y_min + torch.arange(y_ticks) / y_ticks * (self.y_max - self.y_min)
-        # z_axis = self.z_min + torch.arange(z_ticks) / z_ticks * (self.z_max - self.z_min)
-        
         x_axis = torch.linspace(self.x_min, self.x_max, x_ticks, device='cuda')
         y_axis = torch.linspace(self.y_min, self.y_max, y_ticks, device='cuda')
         z_axis = torch.linspace(self.z_min, self.z_max, z_ticks, device='cuda')
@@ -40,13 +36,6 @@ class Volume:
         xx, yy, zz = torch.meshgrid([x_axis, y_axis, z_axis])
         return torch.concat([xx.unsqueeze(-1), yy.unsqueeze(-1), zz.unsqueeze(-1)], dim=-1)
     
-    # def test_contents(self, network_fn, query_fn, threshold=0.4):
-    #     if self.resolution < np.max([self.x_max - self.x_min, self.y_max - self.y_min, self.z_max - self.z_min]):
-    #         return False
-    #     res = query_fn(points, torch.rand_like(points[:, 0], device=self.device), network_fn)[..., 3]
-    #     # return (res.reshape([-1]) > 0.5).sum() > num_sample * threshold
-    #     return (torch.sigmoid(res.reshape([-1])) > 0.5).sum() > num_sample * threshold
-        
     def reconstruct(self, network_fn, query_fn):
         query = self.build_query()
         # volume = query_fn(query, torch.rand_like(query[:, :, 0], device='cuda'), network_fn)[..., 3]

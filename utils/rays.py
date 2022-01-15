@@ -1,5 +1,5 @@
 '''
-LastEditTime: 2022-01-09 07:33:30
+LastEditTime: 2022-01-15 10:08:57
 Description: Functions to sample or compute rays
 Date: 2022-01-09 07:14:51
 Author: Aiden Li
@@ -10,19 +10,19 @@ import torch
 import numpy as np
 
 def get_rays(H, W, focal, cam_to_world):
+    cam_to_world = cam_to_world.detach().cpu().numpy()
+    rays_o, rays_d = get_rays_np(H, W, focal, cam_to_world)
+    return torch.from_numpy(rays_o).cuda(), torch.from_numpy(rays_d).cuda()
+    
     i, j = torch.meshgrid(torch.linspace(0, W - 1, W), torch.linspace(0, H - 1, H))  # pytorch's meshgrid has indexing='ij'
     i = i.t()
     j = j.t()
     dirs = torch.stack([(i - W * .5) / focal, - (j - H * .5) / focal, torch.ones_like(i)], -1)
     # Rotate ray directions from camera frame to the world frame
-    # TODO: use unsqueeze()
     rays_d = torch.sum(dirs[..., np.newaxis, :] * cam_to_world[:3, :3], -1)  # dot product, equals to: [cam_to_world.dot(dir) for dir in dirs]
     # Translate camera frame's origin to the world frame. It is the origin of all rays.
     rays_o = cam_to_world[:3, -1].expand(rays_d.shape)
     return rays_o, rays_d
-
-def get_rays_eff_np(H, W, focal, cam_to_world):
-    pass
 
 def get_rays_np(H, W, focal, cam_to_world):
     i, j = np.meshgrid(np.arange(W, dtype=np.float32), np.arange(H, dtype=np.float32), indexing='xy')
@@ -34,7 +34,6 @@ def get_rays_np(H, W, focal, cam_to_world):
     rays_o = np.broadcast_to(cam_to_world[:3, -1], np.shape(rays_d))
     return rays_o, rays_d
 
-# TODO: Try to fix bugs in this: (computational NaN bugs)
 def ndc_rays(H, W, focal, near, rays_o, rays_d):
     # Shift ray origins to near plane
     t = - (near + rays_o[..., 2]) / (rays_d[..., 2] + 1e-5)
@@ -53,4 +52,3 @@ def ndc_rays(H, W, focal, near, rays_o, rays_d):
     rays_d = torch.stack([d0, d1, d2], -1)
     
     return rays_o, rays_d
-
