@@ -415,7 +415,7 @@ def render_rays(ray_batch,
         bounds = torch.cat([z_vals[..., :1], mi, z_vals[..., :1]], dim=-1)
         
         # Sampling via ITS:
-        z_vals_fine = inverse_transform_sampling_pcpdf(bounds, weights, N_importance)
+        z_vals_fine = its_from_weights(bounds, weights, N_importance)
         z_vals_fine, _ = torch.cat([z_vals, z_vals_fine], dim=-1).sort(dim=-1)
         points_fine = (rays_o[..., None, :] + rays_d[..., None, :] * z_vals_fine[..., :, None])
         

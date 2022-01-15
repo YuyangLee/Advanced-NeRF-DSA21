@@ -1,5 +1,5 @@
 '''
-LastEditTime: 2022-01-08 16:56:04
+LastEditTime: 2022-01-15 08:26:24
 Description: Sampling functions
 Date: 2022-01-07 17:59:23
 Author: Aiden Li
@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 
 plot_samples = 5
 
-def inverse_transform_sampling_pcpdf(bounds, weights, num_points_fine):
+def its_from_weights(bounds, weights, num_points_fine):
     """Inverse Transform Sampling from piecewise-constant pdf
 
     Args:
@@ -42,8 +42,8 @@ def inverse_transform_sampling_pcpdf(bounds, weights, num_points_fine):
     
     sampled = lo + (hi - lo) * t_rand  
     
-    bd = bounds[0].detach().cpu().numpy()
-    sm = sampled[0].detach().cpu().numpy()
+    # bd = bounds[0].detach().cpu().numpy()
+    # sm = sampled[0].detach().cpu().numpy()
     
     # Visualize:
     # - PDF
