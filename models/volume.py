@@ -1,5 +1,5 @@
 '''
-LastEditTime: 2022-01-16 07:36:24
+LastEditTime: 2022-01-16 07:43:58
 Description: The Volume class for 3D reconstruction.
 Date: 2022-01-09 07:45:29
 Author: Aiden Li
@@ -9,7 +9,6 @@ import os
 import torch
 import numpy as np
 from numpy.lib.arraysetops import isin
-from utils.codec import *
 from models.nerf import *
 from models.octree import *
 

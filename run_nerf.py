@@ -539,7 +539,7 @@ def config_parser():
                         help='frequency of weight ckpt saving')
     parser.add_argument("--i_testset", type=int, default=50000,
                         help='frequency of testset saving')
-    parser.add_argument("--i_video",   type=int, default=50000,
+    parser.add_argument("--i_video",   type=int, default=10000,
                         help='frequency of render_poses video saving')
     parser.add_argument("--i_reconstruct",   type=int, default=50000,
                         help='frequency of reconstruct 3d scene')
@@ -547,6 +547,43 @@ def config_parser():
     return parser
 
 
+# def render_vids_debug(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
+#     H, W, focal = hwf
+#     if render_factor != 0:
+#         # Render downsampled for speed
+#         H = H//render_factor
+#         W = W//render_factor
+#         focal = focal/render_factor
+        
+#     rgbs_gt = []
+#     # disps_gt = []
+#     rgbs = []
+#     # disps = []
+    
+#     t = time.time()
+#     for i, cam_to_world in enumerate(tqdm(render_poses)):
+#         print(i, time.time() - t)
+#         t = time.time()
+#         rays_o, rays_d = get_rays(H, W, focal, torch.Tensor(cam_to_world))
+#         batch_rays = torch.stack([rays_o, rays_d], dim=0)
+#         rgb, _, _, _ = render(H, W, focal, chunk=args.chunk, rays=batch_rays, verbose=i < 10, retraw=True, **render_kwargs)
+        
+#         rgbs_gt.append(gt_imgs[i])
+#         rgbs.append(rgb.cpu().numpy())
+#         # disps.append(disp.cpu().numpy())
+#         if i == 0:
+#             print(rgb.shape)
+            
+#         if savedir is not None:
+#             rgb8 = to8b(rgbs[-1])
+#             filename = os.path.join(savedir, '{:03d}.png'.format(i))
+#             imageio.imwrite(filename, rgb8)
+            
+#     imageio.mimwrite(os.path.join(savedir, 'rgb.mp4'), to8b(rgbs), fps=30, quality=8)
+#     rgbs = np.stack(rgbs, 0)
+
+#     return rgbs
+    
 def render_vids(render_poses, hwf, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
     H, W, focal = hwf
 
@@ -613,8 +650,8 @@ def train(args):
     expname = args.expname
     
     os.makedirs(os.path.join(basedir, expname), exist_ok=True)
-    # os.makedirs(os.path.join(basedir, expname, "img", date_unique_tag, time_unique_tag), exist_ok=True)
-    # os.makedirs(os.path.join(basedir, expname, "reconstruct", date_unique_tag, time_unique_tag), exist_ok=True)
+    os.makedirs(os.path.join(basedir, expname, "img", date_unique_tag, time_unique_tag), exist_ok=True)
+    os.makedirs(os.path.join(basedir, expname, "reconstruct", date_unique_tag, time_unique_tag), exist_ok=True)
     
     f = os.path.join(basedir, expname, 'args.txt')
     with open(f, 'w') as file:
@@ -679,8 +716,7 @@ def train(args):
 
             rgbs, _ = render_vids(render_poses, hwf, args.chunk, render_kwargs_test, gt_imgs=images, savedir=testsavedir, render_factor=args.render_factor)
             print('Done rendering', testsavedir)
-            imageio.mimwrite(os.path.join(
-                testsavedir, 'video.mp4'), to8b(rgbs), fps=30, quality=8)
+            imageio.mimwrite(os.path.join(testsavedir, 'video.mp4'), to8b(rgbs), fps=30, quality=8)
 
             return
 
@@ -713,7 +749,7 @@ def train(args):
     if use_batching:
         rays_rgb = torch.Tensor(rays_rgb).to(device)
 
-    N_iters = 200000 + 1
+    N_iters = 300000 + 1
     print('Begin')
     print('TRAIN views are', i_train)
     print('TEST views are', i_test)
@@ -811,30 +847,6 @@ def train(args):
         #     }, path)
         #     print('Saved checkpoints at', path)
 
-        if True:
-        # if i % args.i_video == 0 and i > 0:
-            with torch.no_grad():
-                rgbs, disps = render_vids(render_poses, hwf, args.chunk, render_kwargs_test)
-            print('Done, saving', rgbs.shape, disps.shape)
-            moviebase = os.path.join(basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
-            imageio.mimwrite(moviebase + 'rgb.mp4', to8b(rgbs), fps=30, quality=8)
-            imageio.mimwrite(moviebase + 'disp.mp4', to8b(disps / np.max(disps)), fps=30, quality=8)
-
-            if args.use_viewdirs:
-                render_kwargs_test['cam_to_world_staticcam'] = render_poses[0][:3,:4]
-                with torch.no_grad():
-                    rgbs_still, _ = render_vids(render_poses, hwf, args.chunk, render_kwargs_test)
-                render_kwargs_test['cam_to_world_staticcam'] = None
-                imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
-
-        # if i % args.i_testset == 0 and i > 0:
-            # testsavedir = os.path.join(basedir, expname, 'testset_{:06d}'.format(i))
-            # os.makedirs(testsavedir, exist_ok=True)
-            # print('test poses shape', poses[i_test].shape)
-            # with torch.no_grad():
-            #     render_path(torch.Tensor(poses[i_test]).to(device), hwf, args.chunk, render_kwargs_test, gt_imgs=images[i_test], savedir=testsavedir)
-            # print('Saved test set')
-
         if i % args.i_print == 0:
             tqdm.write(f"[TRAIN] Iter: {i} Loss: {loss.item()}  PSNR: {psnr.item()}")
             # print(expname, i, psnr.numpy(), loss.numpy(), global_step.numpy())
@@ -871,6 +883,33 @@ def train(args):
         # if i % args.i_reconstruct == 0:
         #     reconstruct(args, render_kwargs_train, os.path.join(rc_path, f"rec-{ i }.html"), i)
 
+        # Something wrong with this function...
+        # if i % args.i_video == 0 and i > 0:
+        #     with torch.no_grad():
+        #         directory = os.path.join(basedir, expname, 'renderonly_{}_{:06d}'.format('test' if args.render_test else 'path', start))
+        #         os.makedirs(directory, exist_ok=True)
+        #         rgbs, disps = render_vids_debug(render_poses, hwf, args.chunk, render_kwargs_test, gt_imgs=images, savedir=directory)
+        #         # rgbs, disps = render_vids(render_poses, hwf, args.chunk, render_kwargs_test)
+        #     print('Done, saving', rgbs.shape, disps.shape)
+        #     moviebase = os.path.join(basedir, expname, '{}_spiral_{:06d}_'.format(expname, i))
+        #     imageio.mimwrite(moviebase + 'rgb.mp4', to8b(rgbs), fps=30, quality=8)
+        #     imageio.mimwrite(moviebase + 'disp.mp4', to8b(disps / np.max(disps)), fps=30, quality=8)
+
+        #     if args.use_viewdirs:
+        #         render_kwargs_test['cam_to_world_staticcam'] = render_poses[0][:3,:4]
+        #         with torch.no_grad():
+        #             rgbs_still, _ = render_vids(render_poses, hwf, args.chunk, render_kwargs_test)
+        #         render_kwargs_test['cam_to_world_staticcam'] = None
+        #         imageio.mimwrite(moviebase + 'rgb_still.mp4', to8b(rgbs_still), fps=30, quality=8)
+
+        # if i % args.i_testset == 0 and i > 0:
+            # testsavedir = os.path.join(basedir, expname, 'testset_{:06d}'.format(i))
+            # os.makedirs(testsavedir, exist_ok=True)
+            # print('test poses shape', poses[i_test].shape)
+            # with torch.no_grad():
+            #     render_path(torch.Tensor(poses[i_test]).to(device), hwf, args.chunk, render_kwargs_test, gt_imgs=images[i_test], savedir=testsavedir)
+            # print('Saved test set')
+
         global_step += 1
 
 def reconstruct(reconstruct_kwargs):
@@ -906,18 +945,22 @@ def reconstruction_benchtest(args):
     args.reconstruct_only = True
     
     # Reconstruction params
-    args.reconstruct_resolution = 2**(-7)
-    args.reconstruct_min_chunk_size = 0.25
+    # args.reconstruct_resolution = 2**(-7)
+    args.reconstruct_min_chunk_size = 2**(-2)
     args.reconstruction_sparse_resolution = 2**(-5)
     args.reconstruction_mean_threshold = 0.025
     args.reconstruct_oct_init_depth = 1
+    
+    # Special: for octree vs octree_lite comparison
+    # args.reconstruct_resolution = 2**(-9)
+    # args.reconstruct_min_chunk_size = 2**(-5)
     
     args.reconstruct_with_octree = True
     args.reconstruct_range = [[-1., 1.], [0., 2.], [-1., 1.]]
     
     # Directly query and reconstruct
-    args.reconstruct_mode = "direct"
-    train(args)
+    # args.reconstruct_mode = "direct"
+    # train(args)
     
     # Use OCTree
     args.reconstruct_mode = "octree"
@@ -933,9 +976,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     # Debug and export arguments
-    # args.render_only = True
-    args.expname = "reconstruction_boost"
-    args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/101000.tar"
+    args.render_only = False
+    args.expname = "vids"
+    # args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/100000.tar"
+    # args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/200000.tar"
     
     # Training arguments
     args.no_batching = True

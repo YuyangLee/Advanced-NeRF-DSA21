@@ -1,5 +1,5 @@
 '''
-LastEditTime: 2022-01-15 10:08:57
+LastEditTime: 2022-01-16 07:51:01
 Description: Functions to sample or compute rays
 Date: 2022-01-09 07:14:51
 Author: Aiden Li
@@ -10,9 +10,9 @@ import torch
 import numpy as np
 
 def get_rays(H, W, focal, cam_to_world):
-    cam_to_world = cam_to_world.detach().cpu().numpy()
-    rays_o, rays_d = get_rays_np(H, W, focal, cam_to_world)
-    return torch.from_numpy(rays_o).cuda(), torch.from_numpy(rays_d).cuda()
+    # cam_to_world = cam_to_world.detach().cpu().numpy()
+    # rays_o, rays_d = get_rays_np(H, W, focal, cam_to_world)
+    # return torch.from_numpy(rays_o).cuda(), torch.from_numpy(rays_d).cuda()
     
     i, j = torch.meshgrid(torch.linspace(0, W - 1, W), torch.linspace(0, H - 1, H))  # pytorch's meshgrid has indexing='ij'
     i = i.t()

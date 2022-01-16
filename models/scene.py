@@ -33,7 +33,7 @@ class Scene:
         self.range = range
         [[self.x_min, self.x_max], [self.y_min, self.y_max], [self.z_min, self.z_max]] = range
         if mode == "octree" or mode == "direct":
-            self.octree = OctreeNode(range=range, init_with_depth=oct_default_depth)
+            self.init_depth = oct_default_depth
         elif mode == "octree_lite":
             self.min_divide = oct_default_depth
         else:
@@ -55,6 +55,7 @@ class Scene:
         time_searched = time_start
         with torch.no_grad():
             if self.mode == "octree":
+                self.octree = OctreeNode(range=self.range, init_with_depth=self.init_depth)
                 sparse_volume = Volume(self.range, sparse_resolution).reconstruct(rec_kwargs['rec_network'], rec_kwargs['network_query_fn'])
                 query_nodes = self.octree.subdivide(min_chunk_size, lambda node: subdivide_discriminator(node, sparse_lo, sparse_volume, sparse_resolution, threshold))
                 query_blocks = len(query_nodes)
