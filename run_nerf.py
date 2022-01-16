@@ -206,10 +206,14 @@ def create_nerf(args):
     ckpt = torch.load(args.load_from_snapshot)
     start = ckpt['global_step']
     model.load_state_dict(ckpt['network_fn_state_dict'])
+    
     if args.N_importance > 0:
-        model_fine.load_state_dict(ckpt['network_fn_state_dict'])
-    # else:
-    optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        if 'network_fine_state_dict' in ckpt.keys():
+            model_fine.load_state_dict(ckpt['network_fine_state_dict'])
+        else:
+            model_fine.load_state_dict(ckpt['network_fn_state_dict'])
+    if not args.reconstruct_only:
+        optimizer.load_state_dict(ckpt['optimizer_state_dict'])
         
     # print('Found ckpts', ckpts)
     # if len(ckpts) > 0 and not args.no_reload:
@@ -607,8 +611,8 @@ def train(args):
     expname = args.expname
     
     os.makedirs(os.path.join(basedir, expname), exist_ok=True)
-    os.makedirs(os.path.join(basedir, expname, "img", date_unique_tag, time_unique_tag), exist_ok=True)
-    os.makedirs(os.path.join(basedir, expname, "reconstruct", date_unique_tag, time_unique_tag), exist_ok=True)
+    # os.makedirs(os.path.join(basedir, expname, "img", date_unique_tag, time_unique_tag), exist_ok=True)
+    # os.makedirs(os.path.join(basedir, expname, "reconstruct", date_unique_tag, time_unique_tag), exist_ok=True)
     
     f = os.path.join(basedir, expname, 'args.txt')
     with open(f, 'w') as file:
@@ -642,7 +646,7 @@ def train(args):
     if args.reconstruct_only:
         reconstruct_kwargs = {
             "mode": args.reconstruct_mode,
-            "export_filename": os.path.join(basedir, args.rec_export_filename),
+            "export_filename": os.path.join(basedir, expname, f"{ args.reconstruct_mode }_{ args.rec_export_filename }"),
             # "export_filename": args.rec_export_filename,
             "rec_network": render_kwargs_train['network_fine'] if (args.N_importance > 0) else render_kwargs_train['network_fn'],
             "network_query_fn": render_kwargs_train['network_query_fn'],
@@ -889,6 +893,38 @@ Total Time Consum.: { str(time_s + time_r)[:5] } s
 """)
     fig = graph_volume(volume, reconstruct_kwargs['export_filename'])
 
+def reconstruction_benchtest(args):
+    print("Benchtest for 3D Scene Reconstruction")
+    
+    # Debug params
+    args.expname = "reconstruct_benchtest"
+    # args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/100000.tar"
+    args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/ptr.tar"
+    args.render_only = False
+    args.reconstruct_only = True
+    
+    # Reconstruction params
+    args.reconstruct_resolution = 2**(-7)
+    args.reconstruct_min_chunk_size = 0.25
+    args.reconstruction_sparse_resolution = 2**(-5)
+    args.reconstruction_mean_threshold = 0.025
+    args.reconstruct_oct_init_depth = 1
+    
+    args.reconstruct_with_octree = True
+    args.reconstruct_range = [[-1., 1.], [0., 2.], [-1., 1.]]
+    
+    # Directly query and reconstruct
+    args.reconstruct_mode = "direct"
+    train(args)
+    
+    # Use OCTree
+    args.reconstruct_mode = "octree"
+    train(args)
+    
+    # Use OCTree Light
+    args.reconstruct_mode = "octree_lite"
+    train(args)
+
 if __name__ == '__main__':
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
     parser = config_parser()
@@ -897,7 +933,6 @@ if __name__ == '__main__':
     # Debug and export arguments
     # args.render_only = True
     args.expname = "reconstruction_boost"
-    # args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/100000.tar"
     args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/101000.tar"
     
     # Training arguments
@@ -915,23 +950,6 @@ if __name__ == '__main__':
     args.i_reconstruct = 500
     args.half_res = True
     
-    # Reconstruction arguments - basic
-    args.reconstruct_with_octree = True
-    # args.reconstruct_only = True
-    args.reconstruct_range = [[-1., 1.], [0., 2.], [-1., 1.]]
-    args.reconstruct_mode = "direct"
-    # args.reconstruct_mode = "octree_lite"
-    # args.reconstruct_mode = "octree"
-    
-    # Reconstruction arguments - params
-    args.reconstruct_resolution = 2**(-7)
-    args.reconstruct_min_chunk_size = 0.25
-    args.reconstruction_sparse_resolution = 2**(-6)
-    args.reconstruction_mean_threshold = 0.01
-    args.reconstruct_oct_init_depth = 1
-    
-    if args.reconstruct_mode not in ["direct", "octree", "octree_lite"]:
-        raise NotImplementedError()
-    
-    train(args)
+    reconstruction_benchtest(args)
+    # train(args)
     
