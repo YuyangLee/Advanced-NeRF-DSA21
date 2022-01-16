@@ -976,9 +976,9 @@ if __name__ == '__main__':
     
     # Debug and export arguments
     args.render_only = False
-    args.expname = "vids"
+    args.expname = "THATS_NOT_MY_NAME"
     # args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/pretrained/100000.tar"
-    # args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/200000.tar"
+    args.load_from_snapshot = "/home/yuyang/dev/Advanced-NeRF-DSA21/logs/just_train_it/200000.tar"
     
     # Training arguments
     args.no_batching = True
@@ -995,5 +995,5 @@ if __name__ == '__main__':
     args.i_reconstruct = 500
     args.half_res = True
     
-    reconstruction_benchtest(args)
-    # train(args)
+    # reconstruction_benchtest(args)
+    train(args)

@@ -1,5 +1,4 @@
 hierar_vis
-logs
 data
 wandb
 misc
@@ -7,3 +6,4 @@ misc
 *nohup*
 *pycache*/
 .vscode/
+localdata_archive/
