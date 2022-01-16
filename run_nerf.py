@@ -245,7 +245,7 @@ def create_nerf(args):
 
     # NDC only good for LLFF-style forward facing data
     if args.dataset_type != 'llff' or args.no_ndc:
-        print('Not ndc!')
+        # print('Not ndc!')
         render_kwargs_train['ndc'] = False
         render_kwargs_train['lindisp'] = args.lindisp
 
@@ -958,9 +958,8 @@ def reconstruction_benchtest(args):
     args.reconstruct_with_octree = True
     args.reconstruct_range = [[-1., 1.], [0., 2.], [-1., 1.]]
     
-    # Directly query and reconstruct
-    # args.reconstruct_mode = "direct"
-    # train(args)
+    args.reconstruct_mode = "direct"
+    train(args)
     
     # Use OCTree
     args.reconstruct_mode = "octree"
@@ -998,4 +997,3 @@ if __name__ == '__main__':
     
     reconstruction_benchtest(args)
     # train(args)
-    
