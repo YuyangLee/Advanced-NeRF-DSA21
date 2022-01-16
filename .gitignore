@@ -5,3 +5,5 @@ wandb
 misc
 *.log
 *nohup*
+*pycache*/
+.vscode/

@@ -1,6 +1,6 @@
 '''
-LastEditTime: 2022-01-14 17:10:50
-Description: Your description
+LastEditTime: 2022-01-16 07:35:57
+Description: The Lightweighted OCTreeNode Class for 3D Scene Reconstruction
 Date: 2022-01-13 16:02:43
 Author: Aiden Li
 LastEditors: Aiden Li (i@aidenli.net)

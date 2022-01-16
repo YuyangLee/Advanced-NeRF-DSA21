@@ -373,15 +373,17 @@ def render_rays(ray_batch,
     
     rgb_map, disp_map, acc_map, depth_map, weights = raw2outputs(raw, z_vals, rays_d, raw_noise_std, white_bkgd, pytest=pytest)
 
+    # Hierarchical Sampling
     if N_importance > 0:
         # inverse transform sampling N_importance points
         bounds = torch.cat([z_vals[..., :1], mi, z_vals[..., :1]], dim=-1)
         
-        # Sampling via ITS:
+        # Sample N_f points from PDF of weights via inverse transform sampling
         z_vals_fine = its_from_weights(bounds, weights, N_importance)
         z_vals_fine, _ = torch.cat([z_vals, z_vals_fine], dim=-1).sort(dim=-1)
         points_fine = (rays_o[..., None, :] + rays_d[..., None, :] * z_vals_fine[..., :, None])
         
+        # network query
         raw_fine = network_query_fn(points_fine, viewdirs, network_fine)
         
         maps_fine, _ = raw2outputs(raw_fine, z_vals_fine, rays_d, raw_noise_std, white_bkgd, pytest=pytest, verbose=True)

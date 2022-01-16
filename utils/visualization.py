@@ -1,6 +1,6 @@
 '''
-LastEditTime: 2022-01-13 18:04:52
-Description: Your description
+LastEditTime: 2022-01-16 07:37:02
+Description: Volume visualization
 Date: 2022-01-13 18:03:51
 Author: Aiden Li
 LastEditors: Aiden Li (i@aidenli.net)
@@ -24,3 +24,5 @@ def graph_volume(volume, dir):
     fig.write_html(dir)
 
     return fig
+
+# TODO: Visualize utilizing other libraries like `Open3D`...
